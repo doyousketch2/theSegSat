@@ -84,7 +84,7 @@ function LO .load()
     pairs[#pairs +1]  = string .format('%02X',  string .byte(bytes))
   end -- while true
 
-  slider = HH /#pairs
+  slider  = HH *.7 /#pairs
 
   local hex2bin  = {  ['0'] = '0000',  ['1'] = '0001',  ['2'] = '0010',  ['3'] = '0011',
                       ['4'] = '0100',  ['5'] = '0101',  ['6'] = '0110',  ['7'] = '0111',
@@ -115,22 +115,26 @@ end -- LO .load
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .wheelmoved(x, y)
-  if y < 0 then
-    if key .isDown( 'rshift' ) then
+  if y < 0 then -- scrolling down
+
+    if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
       offset  = offset +2
     else
       offset  = offset +64
     end
-    -- it crashes if you scroll too far,  this overflow check needs to be changed
-    if offset > #bits -rows *tileHeight -cols *tileWidth then
-      offset  = #bits -rows *tileHeight -cols *tileWidth
+
+    if offset > #bits -rows *tileHeight *cols *tileWidth then
+      offset  = #bits -rows *tileHeight *cols *tileWidth
     end
-  elseif y > 0 then
-    if key .isDown( 'rshift' ) then
+
+  elseif y > 0 then -- scrolling up
+
+    if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
       offset  = offset -2
     else
       offset  = offset -64
     end
+
     if offset < 0 then
       offset  = 0
     end
@@ -201,7 +205,7 @@ function LO .draw()
   -- slider dot on right side of screen
   gra .setPointSize( 16 )
   gra .setColor( 220,  220,  220,  50 )
-  gra .points( WW -10,  offset *slider )
+  gra .points( WW -10,  offset *slider +20 )
 
   -- cursor
   gra .setPointSize( fontsize )
