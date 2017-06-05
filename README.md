@@ -24,10 +24,3 @@ Linux, while inside theSegSat dir:
 Win:  
 >Zip the folder and rename it **theSegSat.love**  
 >Open Love2D, then drag that file onto the window  
-
----
-*It crashes if you scroll too far...*
-
-Not a biggie.  It's supposed to keep that from happening,  
-but Lua starts counting from 1 instead of 0  
-so I prolly have to subtract 1 from the rows and cols.
