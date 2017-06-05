@@ -21,6 +21,7 @@ Open in Love2D:
 Linux, while inside theSegSat dir:  
 >love .
 
-Win:  
->Zip the folder and rename it **theSegSat.love**  
->Open Love2D, then drag that file onto the window  
+Win, Mac:  
+>Drag **theSegSat** folder onto your Love2D shortcut  
+
+For more info:  https://love2d.org/wiki/Getting_Started
