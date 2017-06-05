@@ -9,7 +9,7 @@ Screensize is set in the conf.lua file:
     If I'm on the laptop screen, I set it to 1200x700  
     'cuz that does better on 1440x768  
 
-Copy font.dat and font8.dat into theSegSat dir.  
+Copy **font.dat** and **font8.dat** into *theSegSat* dir.  
 I could do that here, but I don't think you can include the font in a GPL license...  
   
     There's a trick to open files outside of that dir,  
