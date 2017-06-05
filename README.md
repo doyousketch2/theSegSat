@@ -16,9 +16,9 @@ I could do that here, but I don't think you can include the font in a GPL licens
     but it involves installing luafilesystem...  meh.  
     This way is easier.  
 
-Open the .love file with Love2D:  
+Open in Love2D:  
 
-Linux:  
+Linux, while inside theSegSat dir:  
 >love .
 
 Win:  
