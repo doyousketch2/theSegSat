@@ -45,7 +45,7 @@ local fontsize  = 13
 local spacing  = fontsize +3
 local font  = gra .newFont( fontsize )
 
-local BPP  = 4
+local BPP  = 2
 local bits  = {}
 local pairs  = {}
 
@@ -98,10 +98,11 @@ function LO .load()
       for s  = 1,  2 do -- 'FF'  to  'F' and 'F'
         this  = string .sub(pairs[i],  s,  s)
 
-        if BPP  == 2 then -- split '1100'  to  '11' and '00'
-          for b  = 1,  3,  2 do
-            bits[#bits +1]  = string .sub( hex2bin[this],  b,  b +1 )
-          end -- for b  = 1,  3,  2
+        if BPP  == 2 then -- reverse low and high bits,  little endian
+
+          local high  = string .sub( hex2bin[this],  1,  2 )
+          local low  = string .sub( hex2bin[this],  3,  4 )
+          bits[#bits +1]  = low ..high
 
         else -- BPP == 4
           bits[#bits +1]  = hex2bin[this]
