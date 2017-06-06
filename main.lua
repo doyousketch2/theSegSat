@@ -164,13 +164,29 @@ function LO .update(dt)
     cursorX  = mou .getX()
     cursorY  = mou .getY()
 
-    if cursorX > WW -80 then
+    if cursorX > cols *tileWidth *gap +21 then
       paint  = math .floor((cursorY-8) /24)
       if paint < 1 then
         paint  = 1
       elseif paint > till then
         paint  = till
       end -- if paint
+    else
+      cursorCol  = math .ceil( (cursorX -21) /gap )
+      cursorRow  = math .floor( (cursorY -11) /gap )
+
+      if cursorCol < 1 then
+        cursorCol = 1
+      elseif cursorCol > cols *tileWidth then
+        cursorCol = cols *tileWidth
+      end -- cursorCol
+
+      if cursorRow < 0 then
+        cursorRow = 0
+      elseif cursorRow > cols *tileHeight then
+        cursorRow = cols *tileHeight
+      end -- cursorRow
+
     end -- if cursorX >
   end -- mou .isDown
 end
@@ -215,7 +231,7 @@ function LO .draw()
           local yy  = r *gap *tileHeight
 
           -- draw pixel
-          gra .rectangle( 'fill',  x *gap +xx +10,  y *gap +yy +10,  pixelSize,  pixelSize )
+          gra .rectangle( 'fill',  x *gap +xx +10,  y *gap +yy,  pixelSize,  pixelSize )
           i  = i +1
 
         end -- tileWidth
@@ -223,9 +239,22 @@ function LO .draw()
     end -- cols
   end -- rows
 
-  -- palette
+  -- grid divisions
   gra .setColor( 220,  220,  220,  50 )
 
+  for i = 1,  cols -1 do
+    local xx  = i *tileWidth *gap +21
+    local yy  = rows *tileHeight *gap +11
+    gra .line( xx,  20,  xx,  yy )
+  end -- for rows
+
+  for i = 1,  rows -1 do
+    local xx  = cols *tileWidth *gap +21
+    local yy  = i *tileHeight *gap +11
+    gra .line( 20,  yy,  xx,  yy )
+  end -- for rows
+
+  -- palette
   if BPP == 2 then
     gra .rectangle( 'line',  WW -70,  20,  40,  120 )
   else
@@ -260,6 +289,11 @@ function LO .draw()
   -- highlight selected color
   gra .setColor( 220,  20,  20,  200 )
   gra .rectangle( 'line',  WW -60,  paint *24 +8,  22,  22 )
+
+  -- outline the pixel you just "painted"
+  local xx  = cursorCol *gap +11
+  local yy  = cursorRow *gap +11
+  gra .rectangle( 'line',  xx,  yy,  gap,  gap )
 
   -- print offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )

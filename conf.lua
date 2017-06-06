@@ -6,7 +6,7 @@ function love .conf(t)
   w .icon   = 'icon.png'
 
   w .width  = 1200
-  w .height = 900
+  w .height = 800
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   t .version  = '0.10.2'               -- The LÖVE version this game was made for (string)
   t .identity  = 'theSegSat'           -- The name of the save directory (string)
