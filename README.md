@@ -4,10 +4,7 @@ Install Love2D  https://love2d.org
 
 Screensize is set in the conf.lua file:  
 
-    It's 1200x900 'cuz that shows up OK on my 1280x1024 monitor.  
-
-    If I'm on the laptop screen, I set it to 1200x700  
-    'cuz that does better on 1440x768  
+    It's 1200x800 'cuz that shows up OK on my 1280x1024 monitor.  
 
 Copy **font.dat** and **font8.dat** into *theSegSat* dir.  
 I could do that here, but I don't think you can include the font in a GPL license...  
