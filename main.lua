@@ -18,7 +18,7 @@ sou  = LO .sound     --
 sys  = LO .system    --
 thr  = LO .thread    --
 tim  = LO .timer        --  enabled
-tou  = LO .touch        --  enabled
+tou  = LO .touch     --
 vid  = LO .video     --
 win  = LO .window       --  enabled
 
@@ -38,14 +38,10 @@ WW  = gra .getWidth()
 
 --     chmod +w fon*.dat
 
-local filename  = 'font8.dat'
+local filename  = 'font.dat'
 local data  = assert(io .open(filename, 'rb'))
 
-local fontsize  = 13
-local spacing  = fontsize +3
-local font  = gra .newFont( fontsize )
-
-local BPP  = 2
+local BPP  = 4          -- font  = 4,  font8  = 2
 local bits  = {}
 local pairs  = {}
 
@@ -58,14 +54,21 @@ local tileHeight  = 16
 local pixelSize  = 11
 local gap  = pixelSize +1
 
+local fontsize  = 13
+local spacing  = fontsize +3
+local font  = gra .newFont( fontsize )
+
 local cursorX  = 80
 local cursorY  = spacing *2 + 10
 local cursorCol  = 1
 local cursorRow  = 0
 
-local header  = 0     -- skip data before here, if needed.  Maybe 2bit uses a header?
-local slider  = 0     -- distance slider travels while scrolling,  will calculate during LO .load()
-local offset  = 0     -- scroll location
+local paint  = 4        -- current color selected to paint with
+local header  = 0       -- skip data before here, if needed.  Maybe 2bit uses a header?
+local slider  = 0       -- distance slider travels while scrolling,  calculated during LO .load()
+
+local till  = 4         -- iterate 'till this many colors.  calculated during LO .load()
+local offset  = 0       -- scroll location
 
 win .setTitle( win .getTitle() ..'     ' ..filename )
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,7 +78,12 @@ function LO .load()
 
   gra .setDefaultFilter( 'nearest',  'nearest',  0 )
   gra .setBackgroundColor( 20,  80,  120 )
-  gra .setLineWidth( 20 )
+  gra .setLineWidth( 2 )
+
+  if BPP == 4 then
+    till  = 16
+    paint  = 16
+  end -- if BPP
 
   -- loop through raw data and put bytes into pairs
   while true do
@@ -121,26 +129,26 @@ function LO .wheelmoved(x, y)
     if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
       offset  = offset +2
     else
-      offset  = offset +64
-    end
+      offset  = offset +128
+    end -- if key
 
     if offset > #bits -rows *tileHeight *cols *tileWidth then
       offset  = #bits -rows *tileHeight *cols *tileWidth
-    end
+    end -- if offset >
 
   elseif y > 0 then -- scrolling up
 
     if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
       offset  = offset -2
     else
-      offset  = offset -64
-    end
+      offset  = offset -128
+    end -- if key
 
     if offset < 0 then
       offset  = 0
-    end
-  end
-end
+    end -- if offset <
+  end -- if y
+end -- LO .wheelmoved
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -155,11 +163,23 @@ function LO .update(dt)
   if mou .isDown(1)  then
     cursorX  = mou .getX()
     cursorY  = mou .getY()
+
+    if cursorX > WW -80 then
+      paint  = math .floor((cursorY-8) /24)
+      if paint < 1 then
+        paint  = 1
+      elseif paint > till then
+        paint  = till
+      end -- if paint
+    end -- if cursorX >
   end -- mou .isDown
 end
 
-
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+local two  = { '11',  '10',  '01',  '00' }
+local four  = { '1111', '1110', '1101', '1100', '1011', '1010', '1001', '1000',
+                '0111', '0110', '0101', '0100', '0011', '0010', '0001', '0000'  }
+
 
 -- includes 2bit,  and 4bit values,  but we're just using 4bit lookups for now.
 local colorTable  = {  ['00']  = { 0,    0,    0,    0 },      ['01']  = { 50,   50,   50,   255 },
@@ -203,19 +223,43 @@ function LO .draw()
     end -- cols
   end -- rows
 
+  -- palette
+  gra .setColor( 220,  220,  220,  50 )
+
+  if BPP == 2 then
+    gra .rectangle( 'line',  WW -70,  20,  40,  120 )
+  else
+    gra .rectangle( 'line',  WW -70,  20,  40,  410 )
+  end
+
+  -- draw in color swatches
+  gra .setPointSize( 20 )
+
+  for i = 1,  till  do
+
+    if BPP == 2 then  -- use index to look up key in colorTable
+      index  = two[i]
+    else
+      index  = four[i]
+    end
+
+    local R  = colorTable[ index ][1]
+    local G  = colorTable[ index ][2]
+    local B  = colorTable[ index ][3]
+    local A  = colorTable[ index ][4]
+
+    gra .setColor( R,  G,  B,  A )
+
+    gra .points( WW -50,  i *24 +20 )
+  end -- for i
+
   -- slider dot on right side of screen
-  gra .setPointSize( 16 )
   gra .setColor( 220,  220,  220,  50 )
   gra .points( WW -10,  offset *slider +20 )
 
-  -- cursor
-  gra .setPointSize( fontsize )
-  if toggle then
-    gra .print( cursorRow ..'  ' ..cursorCol,  100,  HH -100 )
-    gra .setColor( 255,  20,  50,  50 )
-  else
-    gra .setColor( 220,  220,  220,  50 )
-  end
+  -- highlight selected color
+  gra .setColor( 220,  20,  20,  200 )
+  gra .rectangle( 'line',  WW -60,  paint *24 +8,  22,  22 )
 
   -- print offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )

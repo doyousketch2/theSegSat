@@ -20,7 +20,7 @@ function love .conf(t)
   m .mouse     = true     -- Provides an interface to the user's mouse.
   m .keyboard  = true     -- Provides an interface to the user's keyboard.
   m .joystick  = false    -- Provides an interface to connected joysticks.
-  m .touch     = true     -- Provides an interface to touch-screen presses.
+  m .touch     = false    -- Provides an interface to touch-screen presses.
 
   m .window    = true     -- Provides an interface for modifying and retrieving information about the program's window.
   m .image     = true     -- Provides an interface to decode encoded image data.
