@@ -187,7 +187,7 @@ function LO .update(dt)
     cursorX  = mou .getX()
     cursorY  = mou .getY()
 
-    if cursorX > cols *tileWidth *gap +21 then   -- clicked right side of screen
+    if cursorX > WW -70 and cursorX < WW -30 then -- clicked within palette
 
       paint  = math .floor((cursorY-8) /24)      -- determine paint color
       if paint < 1 then                          -- min value
@@ -196,7 +196,7 @@ function LO .update(dt)
         paint  = till
       end -- if paint
 
-    else                                         -- clicked within pixel grid
+    elseif cursorX < cols *tileWidth *gap +21 then -- clicked within pixel grid
       cursorCol  = math .ceil( (cursorX -21) /gap )
       cursorRow  = math .floor( (cursorY -11) /gap )
 
