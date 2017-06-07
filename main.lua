@@ -97,6 +97,7 @@ local colorTable  = {  ['00']  = { 0,    0,    0,    0 },      ['01']  = { 50,  
                        ['1010']  = { 150,  150,  150,  255 },  ['1011']  = { 165,  165,  165,  255 },
                        ['1100']  = { 180,  180,  180,  255 },  ['1101']  = { 195,  195,  195,  255 },
                        ['1110']  = { 210,  210,  210,  255 },  ['1111']  = { 255,  255,  255,  255 }  }
+
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .load()
@@ -222,18 +223,17 @@ function LO .update(dt)
     local tileRow  = math .floor( cursorRow /tileHeight )
 
     local oneTile  = tileY *tileWidth + tileX
-    local xx  = tileCol *128
+    local xx  = tileCol *128                     -- 8x8  = 64 *2  = 128
     local yy  = tileRow *128 *cols
 
     pixel  = oneTile +xx +yy +offset
 
-    local index  = two[paint] -- lookup index
+    local digits  = two[paint] -- lookup binary
     if BPP == 4 then
-      index  = four[paint]
+      digits  = four[paint]
     end -- if BPP
 
-    -- hex2bin[index] -- use index to access value
-    bits[pixel]  = '1111'
+    bits[pixel]  = digits
     end -- if cursorX >
   end -- mou .isDown
 end
@@ -320,7 +320,7 @@ function LO .draw()
   gra .setColor( 220,  20,  20,  200 )
   gra .rectangle( 'line',  WW -60,  paint *24 +8,  22,  22 )
 
-  -- outline the pixel you just "painted"
+  -- outline the pixel you just painted
   local xx  = cursorCol *gap +11
   local yy  = cursorRow *gap +11
   gra .rectangle( 'line',  xx,  yy,  gap,  gap )
