@@ -42,8 +42,10 @@ local filename  = 'font.dat'
 local data  = assert(io .open(filename, 'rb'))
 
 local BPP  = 4          -- font  = 4,  font8  = 2
+
 local bits  = {}
-local pairs  = {}
+local pairs  = {}       -- pairs of nibbles, essentially bytes
+                       -- used variable 'bytes' for raw data read, plus I intended to split these
 
 local cols  = 11
 local rows  = 4
@@ -69,8 +71,32 @@ local slider  = 0       -- distance slider travels while scrolling,  calculated 
 
 local till  = 4         -- iterate 'till this many colors.  calculated during LO .load()
 local offset  = 0       -- scroll location
+local pixel  = 0        -- pixel location
 
 win .setTitle( win .getTitle() ..'     ' ..filename )
+
+local hex2bin  = {  ['0'] = '0000',  ['1'] = '0001',  ['2'] = '0010',  ['3'] = '0011',
+                    ['4'] = '0100',  ['5'] = '0101',  ['6'] = '0110',  ['7'] = '0111',
+                    ['8'] = '1000',  ['9'] = '1001',  ['A'] = '1010',  ['B'] = '1011',
+                    ['C'] = '1100',  ['D'] = '1101',  ['E'] = '1110',  ['F'] = '1111'  }
+
+-- index lookups, 'cuz key-value pairs are unordered in Lua
+local two  = { '11',  '10',  '01',  '00' }
+local four  = { '1111', '1110', '1101', '1100', '1011', '1010', '1001', '1000',
+                '0111', '0110', '0101', '0100', '0011', '0010', '0001', '0000'  }
+
+-- includes 2bit,  and 4bit values,  but we're just using 4bit lookups for now.
+local colorTable  = {  ['00']  = { 0,    0,    0,    0 },      ['01']  = { 50,   50,   50,   255 },
+                       ['10']  = { 100,  100,  100,  255 },    ['11']  = { 150,  150,  150,  255 },
+
+                       ['0000']  = { 0,    0,    0,    0  },   ['0001']  = { 15,   15,   15,   255 },
+                       ['0010']  = { 30,   30,   30,   255 },  ['0011']  = { 45,   45,   45,   255 },
+                       ['0100']  = { 60,   60,   60,   255 },  ['0101']  = { 75,   75,   75,   255 },
+                       ['0110']  = { 90,   90,   90,   255 },  ['0111']  = { 105,  105,  105,  255 },
+                       ['1000']  = { 120,  120,  120,  255 },  ['1001']  = { 135,  135,  135,  255 },
+                       ['1010']  = { 150,  150,  150,  255 },  ['1011']  = { 165,  165,  165,  255 },
+                       ['1100']  = { 180,  180,  180,  255 },  ['1101']  = { 195,  195,  195,  255 },
+                       ['1110']  = { 210,  210,  210,  255 },  ['1111']  = { 255,  255,  255,  255 }  }
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .load()
@@ -93,11 +119,6 @@ function LO .load()
   end -- while true
 
   slider  = HH *.7 /#pairs
-
-  local hex2bin  = {  ['0'] = '0000',  ['1'] = '0001',  ['2'] = '0010',  ['3'] = '0011',
-                      ['4'] = '0100',  ['5'] = '0101',  ['6'] = '0110',  ['7'] = '0111',
-                      ['8'] = '1000',  ['9'] = '1001',  ['A'] = '1010',  ['B'] = '1011',
-                      ['C'] = '1100',  ['D'] = '1101',  ['E'] = '1110',  ['F'] = '1111'  }
 
   -- convert to binary
   for i  = 1,  #pairs do  -- "FF"
@@ -127,24 +148,25 @@ function LO .wheelmoved(x, y)
   if y < 0 then -- scrolling down
 
     if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
-      offset  = offset +2
+      offset  = offset +2    -- fine rate of change, in case you need to offset file for some reason
     else
-      offset  = offset +128
+      offset  = offset +128            -- 8x8 = 64 pixels  *2 at a time = 128
     end -- if key
 
-    if offset > #bits -rows *tileHeight *cols *tileWidth then
-      offset  = #bits -rows *tileHeight *cols *tileWidth
+    local max  = #bits -rows *tileHeight *cols *tileWidth  -- max value
+    if offset > max then
+      offset  = max
     end -- if offset >
 
   elseif y > 0 then -- scrolling up
 
     if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
-      offset  = offset -2
+      offset  = offset -2    -- fine rate of change, in case you need to offset file for some reson
     else
-      offset  = offset -128
+      offset  = offset -128            -- 8x8 = 64 pixels  *2 at a time = 128
     end -- if key
 
-    if offset < 0 then
+    if offset < 0 then                                     -- min value
       offset  = 0
     end -- if offset <
   end -- if y
@@ -164,51 +186,59 @@ function LO .update(dt)
     cursorX  = mou .getX()
     cursorY  = mou .getY()
 
-    if cursorX > cols *tileWidth *gap +21 then
-      paint  = math .floor((cursorY-8) /24)
-      if paint < 1 then
+    if cursorX > cols *tileWidth *gap +21 then   -- clicked right side of screen
+
+      paint  = math .floor((cursorY-8) /24)      -- determine paint color
+      if paint < 1 then                          -- min value
         paint  = 1
-      elseif paint > till then
+      elseif paint > till then                   -- max
         paint  = till
       end -- if paint
-    else
+
+    else                                         -- clicked within pixel grid
       cursorCol  = math .ceil( (cursorX -21) /gap )
       cursorRow  = math .floor( (cursorY -11) /gap )
 
-      if cursorCol < 1 then
+      if cursorCol < 1 then                      -- min value Col
         cursorCol = 1
-      elseif cursorCol > cols *tileWidth then
+      elseif cursorCol > cols *tileWidth then    -- max
         cursorCol = cols *tileWidth
       end -- cursorCol
 
-      if cursorRow < 0 then
+      if cursorRow < 0 then                      -- min value Row
         cursorRow = 0
-      elseif cursorRow > cols *tileHeight then
+      elseif cursorRow > cols *tileHeight then   -- max
         cursorRow = cols *tileHeight
       end -- cursorRow
 
+    local tileX  = cursorCol %tileWidth
+    if tileX == 0 then
+      tileX  = tileWidth
+    end
+
+    local tileY  = cursorRow %tileHeight
+
+    local tileCol  = math .floor( (cursorCol -1) /tileWidth )
+    local tileRow  = math .floor( cursorRow /tileHeight )
+
+    local oneTile  = tileY *tileWidth + tileX
+    local xx  = tileCol *128
+    local yy  = tileRow *128 *cols
+
+    pixel  = oneTile +xx +yy +offset
+
+    local index  = two[paint] -- lookup index
+    if BPP == 4 then
+      index  = four[paint]
+    end -- if BPP
+
+    -- hex2bin[index] -- use index to access value
+    bits[pixel]  = '1111'
     end -- if cursorX >
   end -- mou .isDown
 end
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-local two  = { '11',  '10',  '01',  '00' }
-local four  = { '1111', '1110', '1101', '1100', '1011', '1010', '1001', '1000',
-                '0111', '0110', '0101', '0100', '0011', '0010', '0001', '0000'  }
-
-
--- includes 2bit,  and 4bit values,  but we're just using 4bit lookups for now.
-local colorTable  = {  ['00']  = { 0,    0,    0,    0 },      ['01']  = { 50,   50,   50,   255 },
-                       ['10']  = { 100,  100,  100,  255 },    ['11']  = { 150,  150,  150,  255 },
-
-                       ['0000']  = { 0,    0,    0,    0  },   ['0001']  = { 15,   15,   15,   255 },
-                       ['0010']  = { 30,   30,   30,   255 },  ['0011']  = { 45,   45,   45,   255 },
-                       ['0100']  = { 60,   60,   60,   255 },  ['0101']  = { 75,   75,   75,   255 },
-                       ['0110']  = { 90,   90,   90,   255 },  ['0111']  = { 105,  105,  105,  255 },
-                       ['1000']  = { 120,  120,  120,  255 },  ['1001']  = { 135,  135,  135,  255 },
-                       ['1010']  = { 150,  150,  150,  255 },  ['1011']  = { 165,  165,  165,  255 },
-                       ['1100']  = { 180,  180,  180,  255 },  ['1101']  = { 195,  195,  195,  255 },
-                       ['1110']  = { 210,  210,  210,  255 },  ['1111']  = { 255,  255,  255,  255 }  }
 
 function LO .draw()
   gra .setPointSize( 5 )
