@@ -34,60 +34,56 @@ WW  = gra .getWidth()
 
 -- The fonts default to read-only, because they came from a CD-ROM
 -- which is fine for now, 'cuz this app is just a viewer so far,
--- but eventually, you'll want to set 'em so you can write changes
+-- but eventually,  you'll want to set 'em so you can write changes
 
---     chmod +w fon*.dat
+--     sudo chmod +w fon*.dat
 
-local filename  = 'font.dat'
-local data  = assert(io .open(filename, 'rb'))
-
-local BPP  = 4          -- font  = 4,  font8  = 2
-
+local filename  = 'font8.dat'
+local BPP  = 4          -- font  = 4,  font8  = 2,  press BPP display to toggle,
+                        -- will lose changes you've painted to file tho,  'cuz it reloads data.
 local bits  = {}
-local pairs  = {}       -- pairs of nibbles, essentially bytes
-                       -- used variable 'bytes' for raw data read, plus I intended to split these
-
-local cols  = 11
-local rows  = 4
-
-local tileWidth  = 8
-local tileHeight  = 16
-
+local couplets  = {}    -- pairs of nibbles,  essentially bytes.
+                        -- used variable 'bytes' for raw data tho,
+                        -- plus I intend to split these nibbles.
 local pixelSize  = 11
 local gap  = pixelSize +1
 
-local fontsize  = 13
-local spacing  = fontsize +3
+local tileWidth  = 8    -- "pixels" per tile
+local tileHeight  = 16
+
+local cols  = 11        -- how many tiles are onscreen at once
+local rows  = 4
+
+local fontsize  = 18
 local font  = gra .newFont( fontsize )
 
-local cursorX  = 80
-local cursorY  = spacing *2 + 10
-local cursorCol  = 1
+local cursorX  = 0      -- actual screen location of mouse
+local cursorY  = 0
+
+local cursorCol  = 1    -- position within the grid-of-pixels that's been clicked on
 local cursorRow  = 0
 
 local paint  = 4        -- current color selected to paint with
-local header  = 0       -- skip data before here, if needed.  Maybe 2bit uses a header?
-local slider  = 0       -- distance slider travels while scrolling,  calculated during LO .load()
+local header  = 0       -- skip data before here, if needed...
 
-local till  = 4         -- iterate 'till this many colors.  calculated during LO .load()
+local till  = 4         -- iterate 'till this many colors.   calculated during LO .load()
+local slider  = 0       -- distance slider travels while scrolling.   ^ ditto
+
+local click  = 0        -- disables click repeat,  when you toggle BPP
 local offset  = 0       -- scroll location
 local pixel  = 0        -- pixel location
+local size  = 1         -- size of paintbrush
 
-win .setTitle( win .getTitle() ..'     ' ..filename )
-
+-- hexadecimal to binary-equivalent chart.  could have math'd it,  but I was tired
 local hex2bin  = {  ['0'] = '0000',  ['1'] = '0001',  ['2'] = '0010',  ['3'] = '0011',
                     ['4'] = '0100',  ['5'] = '0101',  ['6'] = '0110',  ['7'] = '0111',
                     ['8'] = '1000',  ['9'] = '1001',  ['A'] = '1010',  ['B'] = '1011',
                     ['C'] = '1100',  ['D'] = '1101',  ['E'] = '1110',  ['F'] = '1111'  }
 
--- index lookups, 'cuz key-value pairs are unordered in Lua
-local two  = { '11',  '10',  '01',  '00' }
-local four  = { '1111', '1110', '1101', '1100', '1011', '1010', '1001', '1000',
-                '0111', '0110', '0101', '0100', '0011', '0010', '0001', '0000'  }
-
--- includes 2bit,  and 4bit values,  but we're just using 4bit lookups for now.
+-- RGBA values.  includes 2bit,  and 4bit values.
+-- can be changed if you want color in 'em,  but they seem to do OK as greyscale.
 local colorTable  = {  ['00']  = { 0,    0,    0,    0 },      ['01']  = { 50,   50,   50,   255 },
-                       ['10']  = { 100,  100,  100,  255 },    ['11']  = { 150,  150,  150,  255 },
+                       ['10']  = { 150,  150,  150,  255 },    ['11']  = { 255,  255,  255,  255 },
 
                        ['0000']  = { 0,    0,    0,    0  },   ['0001']  = { 15,   15,   15,   255 },
                        ['0010']  = { 30,   30,   30,   255 },  ['0011']  = { 45,   45,   45,   255 },
@@ -98,35 +94,50 @@ local colorTable  = {  ['00']  = { 0,    0,    0,    0 },      ['01']  = { 50,  
                        ['1100']  = { 180,  180,  180,  255 },  ['1101']  = { 195,  195,  195,  255 },
                        ['1110']  = { 210,  210,  210,  255 },  ['1111']  = { 255,  255,  255,  255 }  }
 
+-- "index to key" lookups, 'cuz key-value pairs are unordered in Lua
+local keystone  = 0               -- variable "key" was already used
+local two  = { '11',  '10',  '01',  '00' }
+local four  = { '1111', '1110', '1101', '1100', '1011', '1010', '1001', '1000',
+                '0111', '0110', '0101', '0100', '0011', '0010', '0001', '0000'  }
+
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-function LO .load()
-  print('Löve App begin')
+function readData()
+  if #bits > 0 then -- clear tables
+    local count  = #bits
+    for i = 1,  count do  bits[i]  = nil end
 
-  gra .setDefaultFilter( 'nearest',  'nearest',  0 )
-  gra .setBackgroundColor( 20,  80,  120 )
-  gra .setLineWidth( 2 )
+    count  = #couplets
+    for i = 1,  count do  couplets[i]  = nil end
+  end -- if #bits
 
-  if BPP == 4 then
+  if BPP == 2 then -- amount of colors available,  then select last color
+    till  = 4
+    paint  = 4
+  else
     till  = 16
     paint  = 16
   end -- if BPP
 
   -- loop through raw data and put bytes into pairs
+  local data  = assert(io .open(filename, 'rb'))
   while true do
     local bytes  = data :read(1)
     if not bytes then  break  end
-    pairs[#pairs +1]  = string .format('%02X',  string .byte(bytes))
+    couplets[#couplets +1]  = string .format('%02X',  string .byte(bytes))
   end -- while true
 
-  slider  = HH *.7 /#pairs
+  offset  = 0
+  cursorCol  = 1
+  cursorRow  = 0
+  slider  = HH /(#couplets *2)
 
   -- convert to binary
-  for i  = 1,  #pairs do  -- "FF"
+  for i  = 1,  #couplets do  -- "FF"
     if i >= header then
-
+                        -- split nibbles
       for s  = 1,  2 do -- 'FF'  to  'F' and 'F'
-        this  = string .sub(pairs[i],  s,  s)
+        local this  = string .sub(couplets[i],  s,  s)
 
         if BPP  == 2 then -- reverse low and high bits,  little endian
 
@@ -140,7 +151,21 @@ function LO .load()
 
       end --  for s  = 1,  2
     end -- if i >= begin
-  end -- for i = 1,  #pairs
+  end -- for i = 1,  #couplets
+end
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+function LO .load()
+  print('Löve App begin')
+
+  win .setTitle( win .getTitle() ..'     ' ..filename )
+  gra .setDefaultFilter( 'nearest',  'nearest',  0 )
+  gra .setBackgroundColor( 20,  80,  120 )
+  gra .setLineWidth( 2 )
+
+  readData()
+
 end -- LO .load
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -162,7 +187,7 @@ function LO .wheelmoved(x, y)
   elseif y > 0 then -- scrolling up
 
     if key .isDown( 'lshift' ) or key .isDown( 'rshift' ) then
-      offset  = offset -2    -- fine rate of change, in case you need to offset file for some reson
+      offset  = offset -2    -- fine rate of change, in case you need to offset file for some reason
     else
       offset  = offset -128            -- 8x8 = 64 pixels  *2 at a time = 128
     end -- if key
@@ -175,6 +200,81 @@ end -- LO .wheelmoved
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+function mouseStuff()
+  cursorX  = mou .getX()
+  cursorY  = mou .getY()
+
+  if cursorX > WW -70 and cursorX < WW -30 then  -- clicked on right-side of screen
+
+    if cursorY < 40 then -- toggle BPP's
+      if click == 0 then -- only do this once,  no repeat
+        if BPP == 2 then  BPP  = 4
+        else  BPP  = 2
+        end -- BPP
+        readData() -- refresh with new BPP value
+        click  = 1
+      end -- if click
+
+    else -- clicked within palette
+      paint  = math .floor((cursorY -38) /24)    -- determine paint color
+      if paint < 1 then                          -- min value
+        paint  = 1
+      elseif paint > till then                   -- max
+        paint  = till
+      end -- if paint
+
+    end -- if cursorY
+  elseif cursorX < cols *tileWidth *gap +21 then -- clicked within pixel grid
+    cursorCol  = math .ceil( (cursorX -21) /gap )
+    cursorRow  = math .floor( (cursorY -11) /gap )
+
+    if cursorCol < 1 then                      -- min value Col
+      cursorCol  = 1
+    elseif cursorCol > cols *tileWidth then    -- max
+      cursorCol  = cols *tileWidth
+    end -- cursorCol
+
+    if cursorRow < 0 then                      -- min value Row
+      cursorRow  = 0
+    elseif cursorRow > cols *tileHeight then   -- max
+      cursorRow  = cols *tileHeight
+    end -- cursorRow
+
+  end -- if cursorX
+end -- mouseStuff()
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+function paintPixel()
+  local tileX  = cursorCol %tileWidth          -- pixel X position within tile
+  if tileX == 0 then
+    tileX  = tileWidth                         -- if mod = 0,  we want to end up in right column
+  end
+
+  local tileY  = cursorRow %tileHeight         -- pixel Y position within tile
+
+  local tileCol  = math .floor( (cursorCol -1) /tileWidth ) -- column of tile on screen-grid
+  local tileRow  = math .floor( cursorRow /tileHeight )     -- row
+
+  local oneTile  = tileY *tileWidth + tileX    -- localize all clicks to one tile
+                                               -- then multiply by grid placement
+
+                                               -- 8x8  = 64 *2  = 128   every grid pos takes up...
+  local xx  = tileCol *128                     -- 128 pixels to jump to the next horiz pos
+  local yy  = tileRow *128 *cols               -- 128x11 tiles per column  = 1408 pixels to go down a row
+
+  pixel  = oneTile +xx +yy +offset             -- current pixel position within the data
+
+  local digits  = two[paint]                   -- lookup binary equivalent
+  if BPP == 4 then
+    digits  = four[paint]
+  end -- if BPP
+
+  bits[pixel]  = digits
+end -- paintPixel()
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 function LO .update(dt)
   -- easy exit
   if key .isDown( 'escape' ) then
@@ -183,91 +283,103 @@ function LO .update(dt)
 
 
   -- check for mouse
-  if mou .isDown(1)  then
-    cursorX  = mou .getX()
-    cursorY  = mou .getY()
+  if mou .isDown(1)  then -- left click
+    mouseStuff()
+    paintPixel()
+    size  = 1
 
-    if cursorX > WW -70 and cursorX < WW -30 then -- clicked within palette
-
-      paint  = math .floor((cursorY-8) /24)      -- determine paint color
-      if paint < 1 then                          -- min value
-        paint  = 1
-      elseif paint > till then                   -- max
-        paint  = till
-      end -- if paint
-
-    elseif cursorX < cols *tileWidth *gap +21 then -- clicked within pixel grid
-      cursorCol  = math .ceil( (cursorX -21) /gap )
-      cursorRow  = math .floor( (cursorY -11) /gap )
-
-      if cursorCol < 1 then                      -- min value Col
-        cursorCol = 1
-      elseif cursorCol > cols *tileWidth then    -- max
-        cursorCol = cols *tileWidth
-      end -- cursorCol
-
-      if cursorRow < 0 then                      -- min value Row
-        cursorRow = 0
-      elseif cursorRow > cols *tileHeight then   -- max
-        cursorRow = cols *tileHeight
-      end -- cursorRow
-
-    local tileX  = cursorCol %tileWidth
-    if tileX == 0 then
-      tileX  = tileWidth
-    end
-
-    local tileY  = cursorRow %tileHeight
-
-    local tileCol  = math .floor( (cursorCol -1) /tileWidth )
-    local tileRow  = math .floor( cursorRow /tileHeight )
-
-    local oneTile  = tileY *tileWidth + tileX
-    local xx  = tileCol *128                     -- 8x8  = 64 *2  = 128
-    local yy  = tileRow *128 *cols
-
-    pixel  = oneTile +xx +yy +offset
-
-    local digits  = two[paint] -- lookup binary
-    if BPP == 4 then
-      digits  = four[paint]
-    end -- if BPP
-
-    bits[pixel]  = digits
-    end -- if cursorX >
+  else -- mouse up
+    click  = 0
   end -- mou .isDown
-end
+
+  if mou .isDown(2)  then -- right click
+    mouseStuff()
+    paintPixel()
+    size  = 4 -- paint 4 pixels
+
+    cursorCol  = cursorCol +1
+    if cursorCol <= tileWidth *cols then
+      paintPixel()
+    end -- if cursorCol <=
+
+    cursorRow  = cursorRow +1
+    if cursorRow <= tileHeight *rows then
+      paintPixel()
+    end -- if cursorRow <=
+
+    cursorCol  = cursorCol -1
+    if cursorCol <= tileWidth *cols then
+      paintPixel()
+    end -- if cursorCol <=
+
+  end -- if mou .isDown(2)
+end -- LO .update(dt)
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .draw()
+  -- draw BPP label
+  gra .print( 'BPP: ' ..BPP,  WW -70,  15 )
+
+  -- draw pixel-grid
   gra .setPointSize( 5 )
 
-  i  = 1
-  for r  = 0,  rows -1  do
-    for c  = 0,  cols -1  do
-      for y  = 1,  tileHeight  do
-        for x  = 1,  tileWidth  do
-          local this  = bits[i + offset]
+  if #bits > 0 then -- don't draw during data swaps
+    i  = 1
+    for r  = 0,  rows -1  do
+      for c  = 0,  cols -1  do
+        for y  = 1,  tileHeight  do
+          for x  = 1,  tileWidth  do
+            keystone  = bits[i + offset]
 
-          local R  = colorTable[this][1]
-          local G  = colorTable[this][2]
-          local B  = colorTable[this][3]
-          local A  = colorTable[this][4]
+            local R  = colorTable[ keystone ][1]
+            local G  = colorTable[ keystone ][2]
+            local B  = colorTable[ keystone ][3]
+            local A  = colorTable[ keystone ][4]
 
-          gra .setColor( R,  G,  B,  A )
+            gra .setColor( R,  G,  B,  A )
 
-          local xx  = c *gap *tileWidth
-          local yy  = r *gap *tileHeight
+            local xx  = c *gap *tileWidth
+            local yy  = r *gap *tileHeight
 
-          -- draw pixel
-          gra .rectangle( 'fill',  x *gap +xx +10,  y *gap +yy,  pixelSize,  pixelSize )
-          i  = i +1
+            -- draw pixel    style,  x pos,           y pos,       width,      height
+            gra .rectangle( 'fill',  x *gap +xx +10,  y *gap +yy,  pixelSize,  pixelSize )
+            i  = i +1
 
-        end -- tileWidth
-      end -- tileHeight
-    end -- cols
-  end -- rows
+          end -- tileWidth
+        end -- tileHeight
+      end -- cols
+    end -- rows
+
+    -- outline palette area
+    if BPP == 2 then
+      gra .rectangle( 'line',  WW -70,  50,  40,  120 )
+    else
+      gra .rectangle( 'line',  WW -70,  50,  40,  410 )
+    end
+
+    -- draw in color swatches
+    gra .setPointSize( 20 )
+
+    for i = 1,  till  do
+
+      if BPP == 2 then -- convert index to key
+        keystone  = two[i]
+      else
+        keystone  = four[i]
+      end
+
+      local R  = colorTable[ keystone ][1]
+      local G  = colorTable[ keystone ][2]
+      local B  = colorTable[ keystone ][3]
+      local A  = colorTable[ keystone ][4]
+
+      gra .setColor( R,  G,  B,  A )
+
+      gra .points( WW -50,  i *24 +50 )
+    end -- for i
+
+  end -- if #bits  a.k.a.  don't draw during data swaps
 
   -- grid divisions
   gra .setColor( 220,  220,  220,  50 )
@@ -275,7 +387,7 @@ function LO .draw()
   for i = 1,  cols -1 do
     local xx  = i *tileWidth *gap +21
     local yy  = rows *tileHeight *gap +11
-    gra .line( xx,  20,  xx,  yy )
+    gra .line( xx,  11,  xx,  yy )
   end -- for rows
 
   for i = 1,  rows -1 do
@@ -284,46 +396,24 @@ function LO .draw()
     gra .line( 20,  yy,  xx,  yy )
   end -- for rows
 
-  -- palette
-  if BPP == 2 then
-    gra .rectangle( 'line',  WW -70,  20,  40,  120 )
-  else
-    gra .rectangle( 'line',  WW -70,  20,  40,  410 )
-  end
-
-  -- draw in color swatches
-  gra .setPointSize( 20 )
-
-  for i = 1,  till  do
-
-    if BPP == 2 then  -- use index to look up key in colorTable
-      index  = two[i]
-    else
-      index  = four[i]
-    end
-
-    local R  = colorTable[ index ][1]
-    local G  = colorTable[ index ][2]
-    local B  = colorTable[ index ][3]
-    local A  = colorTable[ index ][4]
-
-    gra .setColor( R,  G,  B,  A )
-
-    gra .points( WW -50,  i *24 +20 )
-  end -- for i
-
   -- slider dot on right side of screen
   gra .setColor( 220,  220,  220,  50 )
   gra .points( WW -10,  offset *slider +20 )
 
   -- highlight selected color
   gra .setColor( 220,  20,  20,  200 )
-  gra .rectangle( 'line',  WW -60,  paint *24 +8,  22,  22 )
+  gra .rectangle( 'line',  WW -60,  paint *24 +38,  22,  22 )
 
-  -- outline the pixel you just painted
-  local xx  = cursorCol *gap +11
-  local yy  = cursorRow *gap +11
-  gra .rectangle( 'line',  xx,  yy,  gap,  gap )
+  -- outline the pixel(s) you just painted
+  if size == 1 then                         -- draw rect around 1 pixel
+    local xx  = cursorCol *gap +11
+    local yy  = cursorRow *gap +11
+    gra .rectangle( 'line',  xx,  yy,  gap,  gap )
+  else                                      -- draw rect around 4 pixels
+    local xx  = cursorCol *gap +11
+    local yy  = cursorRow *gap
+    gra .rectangle( 'line',  xx,  yy,  gap *2,  gap *2 )
+  end
 
   -- print offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )
