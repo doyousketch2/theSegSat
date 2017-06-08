@@ -69,7 +69,10 @@ local header  = 0       -- skip data before here, if needed...
 local till  = 4         -- iterate 'till this many colors.   calculated during LO .load()
 local slider  = 0       -- distance slider travels while scrolling.   ^ ditto
 
+
 local click  = 0        -- disables click repeat,  when you toggle BPP
+local cursor  = 1       -- display cursor position?
+
 local offset  = 0       -- scroll location
 local pixel  = 0        -- pixel location
 local size  = 1         -- size of paintbrush
@@ -205,6 +208,7 @@ function mouseStuff()
   cursorY  = mou .getY()
 
   if cursorX > WW -70 and cursorX < WW -30 then  -- clicked on right-side of screen
+    cursor  = 0
 
     if cursorY < 40 then -- toggle BPP's
       if click == 0 then -- only do this once,  no repeat
@@ -227,6 +231,7 @@ function mouseStuff()
   elseif cursorX < cols *tileWidth *gap +21 then -- clicked within pixel grid
     cursorCol  = math .ceil( (cursorX -21) /gap )
     cursorRow  = math .floor( (cursorY -11) /gap )
+    cursor  = 1
 
     if cursorCol < 1 then                      -- min value Col
       cursorCol  = 1
@@ -246,31 +251,33 @@ end -- mouseStuff()
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function paintPixel()
-  local tileX  = cursorCol %tileWidth          -- pixel X position within tile
-  if tileX == 0 then
-    tileX  = tileWidth                         -- if mod = 0,  we want to end up in right column
-  end
+  if cursor == 1 then
+    local tileX  = cursorCol %tileWidth          -- pixel X position within tile
+    if tileX == 0 then
+      tileX  = tileWidth                         -- if mod = 0,  we want to end up in right column
+    end
 
-  local tileY  = cursorRow %tileHeight         -- pixel Y position within tile
+    local tileY  = cursorRow %tileHeight         -- pixel Y position within tile
 
-  local tileCol  = math .floor( (cursorCol -1) /tileWidth ) -- column of tile on screen-grid
-  local tileRow  = math .floor( cursorRow /tileHeight )     -- row
+    local tileCol  = math .floor( (cursorCol -1) /tileWidth ) -- column of tile on screen-grid
+    local tileRow  = math .floor( cursorRow /tileHeight )     -- row
 
-  local oneTile  = tileY *tileWidth + tileX    -- localize all clicks to one tile
-                                               -- then multiply by grid placement
+    local oneTile  = tileY *tileWidth + tileX    -- localize all clicks to one tile
+                                                 -- then multiply by grid placement
 
-                                               -- 8x8  = 64 *2  = 128   every grid pos takes up...
-  local xx  = tileCol *128                     -- 128 pixels to jump to the next horiz pos
-  local yy  = tileRow *128 *cols               -- 128x11 tiles per column  = 1408 pixels to go down a row
+                                                 -- 8x8  = 64 *2  = 128   every grid pos takes up...
+    local xx  = tileCol *128                     -- 128 pixels to jump to the next horiz pos
+    local yy  = tileRow *128 *cols               -- 128x11 tiles per column  = 1408 pixels to go down a row
 
-  pixel  = oneTile +xx +yy +offset             -- current pixel position within the data
+    pixel  = oneTile +xx +yy +offset             -- current pixel position within the data
 
-  local digits  = two[paint]                   -- lookup binary equivalent
-  if BPP == 4 then
-    digits  = four[paint]
-  end -- if BPP
+    local digits  = two[paint]                   -- lookup binary equivalent
+    if BPP == 4 then
+      digits  = four[paint]
+    end -- if BPP
 
-  bits[pixel]  = digits
+    bits[pixel]  = digits
+  end -- if cursor
 end -- paintPixel()
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -352,6 +359,7 @@ function LO .draw()
     end -- rows
 
     -- outline palette area
+    gra .setColor( 220,  220,  220,  50 )
     if BPP == 2 then
       gra .rectangle( 'line',  WW -70,  50,  40,  120 )
     else
@@ -405,19 +413,22 @@ function LO .draw()
   gra .rectangle( 'line',  WW -60,  paint *24 +38,  22,  22 )
 
   -- outline the pixel(s) you just painted
-  if size == 1 then                         -- draw rect around 1 pixel
-    local xx  = cursorCol *gap +11
-    local yy  = cursorRow *gap +11
-    gra .rectangle( 'line',  xx,  yy,  gap,  gap )
-  else                                      -- draw rect around 4 pixels
-    local xx  = cursorCol *gap +11
-    local yy  = cursorRow *gap
-    gra .rectangle( 'line',  xx,  yy,  gap *2,  gap *2 )
-  end
+  if cursor > 0 then -- skip during palette select
+    if size == 1 then                         -- draw rect around 1 pixel
+      local xx  = cursorCol *gap +11
+      local yy  = cursorRow *gap +11
+      gra .rectangle( 'line',  xx,  yy,  gap,  gap )
+    else                                      -- draw rect around 4 pixels
+      local xx  = cursorCol *gap +11
+      local yy  = cursorRow *gap
+      gra .rectangle( 'line',  xx,  yy,  gap *2,  gap *2 )
+    end -- if size
+  end -- if cursorCol > 0
 
-  -- print offset in bottom-right corner
+  -- print save & offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )
-  gra .print( offset,  WW -100,  HH -20 )
+  -- gra .print( 'Save',  WW -70,  HH -50 )
+  gra .print( offset,  WW -100,  HH -30 )
 end -- LO .draw()
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
