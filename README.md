@@ -29,3 +29,7 @@ Right-click to paint 4 pixels at a time.  Good for erasing.
 
 Click the BPP display to toggle between 2bit and 4 bit.  
 Reloads data, so any changes you have painted will revert.  
+
+Save is almost functional.  It saves, but cuts off halfway through.  
+If your terminal has a decent scrollback,  you can test it yourself.  
+`diff -y <(xxd font8.dat) <(xxd newfont.dat) | colordiff`
