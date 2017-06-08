@@ -22,3 +22,10 @@ Win, Mac:
 >Drag **theSegSat** folder onto your Love2D shortcut  
 
 For more info:  https://love2d.org/wiki/Getting_Started
+
+---
+
+Right-click to paint 4 pixels at a time.  Good for erasing.  
+
+Can click the BPP display to toggle between 2bit and 4 bit.  
+Reloads data though, so any changes you have painted will revert.  
