@@ -39,7 +39,7 @@ WW  = gra .getWidth()
 --     sudo chmod +w fon*.dat
 
 local filename  = 'font8.dat'
-local BPP  = 4          -- font  = 4,  font8  = 2,  press BPP display to toggle,
+local BPP  = 2          -- font  = 4,  font8  = 2,  press BPP display to toggle,
                         -- will lose changes you've painted to file tho,  'cuz it reloads data.
 local bits  = {}
 local couplets  = {}    -- pairs of nibbles,  essentially bytes.
@@ -69,7 +69,6 @@ local header  = 0       -- skip data before here, if needed...
 local till  = 4         -- iterate 'till this many colors.   calculated during LO .load()
 local slider  = 0       -- distance slider travels while scrolling.   ^ ditto
 
-
 local click  = 0        -- disables click repeat,  when you toggle BPP
 local cursor  = 1       -- display cursor position?
 
@@ -77,11 +76,20 @@ local offset  = 0       -- scroll location
 local pixel  = 0        -- pixel location
 local size  = 1         -- size of paintbrush
 
+local maxW  = cols *tileWidth *gap +21   -- boundaries of clickable grid area
+local maxH  = rows *tileHeight *gap +11
+
 -- hexadecimal to binary-equivalent chart.  could have math'd it,  but I was tired
 local hex2bin  = {  ['0'] = '0000',  ['1'] = '0001',  ['2'] = '0010',  ['3'] = '0011',
                     ['4'] = '0100',  ['5'] = '0101',  ['6'] = '0110',  ['7'] = '0111',
                     ['8'] = '1000',  ['9'] = '1001',  ['A'] = '1010',  ['B'] = '1011',
                     ['C'] = '1100',  ['D'] = '1101',  ['E'] = '1110',  ['F'] = '1111'  }
+
+
+local bin2hex  = {  ['0000'] = '0',  ['0001'] = '1',  ['0010'] = '2',  ['0011'] = '3',
+                    ['0100'] = '4',  ['0101'] = '5',  ['0110'] = '6',  ['0111'] = '7',
+                    ['1000'] = '8',  ['1001'] = '9',  ['1010'] = 'A',  ['1011'] = 'B',
+                    ['1100'] = 'C',  ['1101'] = 'D',  ['1110'] = 'E',  ['1111'] = 'F'  }
 
 -- RGBA values.  includes 2bit,  and 4bit values.
 -- can be changed if you want color in 'em,  but they seem to do OK as greyscale.
@@ -136,25 +144,71 @@ function readData()
   slider  = HH /(#couplets *2)
 
   -- convert to binary
-  for i  = 1,  #couplets do  -- "FF"
+  for i = 1,  #couplets do  -- "FF"
     if i >= header then
                         -- split nibbles
-      for s  = 1,  2 do -- 'FF'  to  'F' and 'F'
+      for s = 1,  2 do   -- 'FF'  to  'F' and 'F'
         local this  = string .sub(couplets[i],  s,  s)
 
-        if BPP  == 2 then -- reverse low and high bits,  little endian
+        if BPP  == 2 then -- reverse twopence,  little endian
 
-          local high  = string .sub( hex2bin[this],  1,  2 )
-          local low  = string .sub( hex2bin[this],  3,  4 )
-          bits[#bits +1]  = low ..high
+          local hex  = hex2bin[ this ]      -- 'C'  to  '1100'
+
+          local high  = string .sub( hex,  1,  2 )   -- '11'
+          local low  = string .sub( hex,  3,  4 )    -- '00'
+
+          bits[#bits +1]  = low ..high               -- '0011'
 
         else -- BPP == 4
-          bits[#bits +1]  = hex2bin[this]
+          bits[#bits +1]  = hex2bin[ this ]
         end -- if BPP
 
       end --  for s  = 1,  2
     end -- if i >= begin
   end -- for i = 1,  #couplets
+end
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+function writeData()
+  local out  = io .open('newfont.dat', 'wb')
+  local str  = ''
+
+  if BPP == 2 then
+    for i = 1,  #bits /2,  2 do -- join two reversed twopence  '0011 1100'
+
+      local high  = string .sub( bits[i],  1,  2 )          -- '00'
+      local low  = string .sub( bits[i],  3,  4 )           --   '11'
+
+      local bin  = low ..high                               -- '1100'
+      local nibble1  = bin2hex[ bin ]                       -- 'C'
+
+      local high  = string .sub( bits[i +1],  1,  2 )           -- '11'
+      local low  = string .sub( bits[i +1],  3,  4 )            --   '00'
+
+      local bin  = low ..high                                   -- '0011'
+      local nibble2  = bin2hex[ bin ]                           -- '3'
+
+      local byte  = nibble1 ..nibble2           -- 'C3'
+      local num  = tonumber( byte,  16 )       -- 195
+      str  = str ..string .char( num )        -- ASCII  U+0195
+    end -- for i = 1,  #bits
+
+  else -- BPP == 4
+    for i = 1,  #bits /2,  2 do -- reverse nibbles
+
+      local high  = bin2hex[ bits[i] ]       -- '1111'  to  'F'
+      local low  = bin2hex[ bits[i +1] ]     -- '0000'  to  '0'
+
+      local hex  = high ..low                -- 'F0'  to  '0F'
+
+      local num  = tonumber( hex,  16 )      -- '0F'  to  15
+      str  = str ..string .char( num )       -- ASCII  U+0015
+    end -- for i = 1,  #bits
+  end
+
+  out :write( str )
+  out :close()
 end
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,7 +273,7 @@ function mouseStuff()
         click  = 1
       end -- if click
 
-    else -- clicked within palette
+    elseif cursorY < 450 then -- clicked within palette
       paint  = math .floor((cursorY -38) /24)    -- determine paint color
       if paint < 1 then                          -- min value
         paint  = 1
@@ -227,8 +281,13 @@ function mouseStuff()
         paint  = till
       end -- if paint
 
+    elseif cursorY > HH -100 then
+      gra .setBackgroundColor( 0,  50,  100 )
+      writeData()
     end -- if cursorY
-  elseif cursorX < cols *tileWidth *gap +21 then -- clicked within pixel grid
+
+  -- clicked within pixel grid?
+  elseif cursorX > 21 and cursorX < maxW and cursorY > 11 and cursorY < maxH then
     cursorCol  = math .ceil( (cursorX -21) /gap )
     cursorRow  = math .floor( (cursorY -11) /gap )
     cursor  = 1
@@ -304,20 +363,20 @@ function LO .update(dt)
     paintPixel()
     size  = 4 -- paint 4 pixels
 
-    cursorCol  = cursorCol +1
-    if cursorCol <= tileWidth *cols then
+    if cursorCol < tileWidth *cols then
+      cursorCol  = cursorCol +1
       paintPixel()
-    end -- if cursorCol <=
+    end -- if cursorCol
 
-    cursorRow  = cursorRow +1
-    if cursorRow <= tileHeight *rows then
-      paintPixel()
-    end -- if cursorRow <=
+    if cursorRow < tileHeight *rows -1 then
+        cursorRow  = cursorRow +1
+        paintPixel()
+    end -- if cursorRow
 
-    cursorCol  = cursorCol -1
-    if cursorCol <= tileWidth *cols then
-      paintPixel()
-    end -- if cursorCol <=
+    if cursorCol > 1 and cursorCol < tileWidth *cols then
+        cursorCol  = cursorCol -1
+        paintPixel()
+    end -- if cursorCol and
 
   end -- if mou .isDown(2)
 end -- LO .update(dt)
@@ -427,7 +486,7 @@ function LO .draw()
 
   -- print save & offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )
-  -- gra .print( 'Save',  WW -70,  HH -50 )
+  gra .print( 'Save',  WW -60,  HH -50 )
   gra .print( offset,  WW -100,  HH -30 )
 end -- LO .draw()
 
