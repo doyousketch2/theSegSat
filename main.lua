@@ -41,10 +41,10 @@ WW  = gra .getWidth()
 local filename  = 'font8.dat'
 local BPP  = 2          -- font  = 4,  font8  = 2,  press BPP display to toggle,
                         -- will lose changes you've painted to file tho,  'cuz it reloads data.
-local bits  = {}
-local couplets  = {}    -- pairs of nibbles,  essentially bytes.
-                        -- used variable 'bytes' for raw data tho,
-                        -- plus I intend to split these nibbles.
+
+local bits  = {}        -- 4 bits in each index location,  binary nibbles
+local duo  = {}         -- pairs of nibbles,  essentially bytes.
+                        -- used variable 'bytes' for raw data tho
 local pixelSize  = 11
 local gap  = pixelSize +1
 
@@ -75,6 +75,7 @@ local cursor  = 1       -- display cursor position?
 local offset  = 0       -- scroll location
 local pixel  = 0        -- pixel location
 local size  = 1         -- size of paintbrush
+local bgCount  = 0      -- background counter,  to flash color after written
 
 local maxW  = cols *tileWidth *gap +21   -- boundaries of clickable grid area
 local maxH  = rows *tileHeight *gap +11
@@ -118,64 +119,66 @@ function readData()
     local count  = #bits
     for i = 1,  count do  bits[i]  = nil end
 
-    count  = #couplets
-    for i = 1,  count do  couplets[i]  = nil end
+    count  = #duo
+    for i = 1,  count do  duo[i]  = nil end
   end -- if #bits
 
-  if BPP == 2 then -- amount of colors available,  then select last color
-    till  = 4
-    paint  = 4
+  if BPP == 2 then
+    till  = 4   -- amount of colors available
+    paint  = 4   -- select last color
   else
     till  = 16
     paint  = 16
   end -- if BPP
 
   -- loop through raw data and put bytes into pairs
-  local data  = assert(io .open(filename, 'rb'))
+  local data  = assert( io .open( filename, 'rb' ))
+
   while true do
     local bytes  = data :read(1)
     if not bytes then  break  end
-    couplets[#couplets +1]  = string .format('%02X',  string .byte(bytes))
+    duo[ #duo +1 ]  = string .format( '%02X',  string .byte( bytes ))
   end -- while true
 
   offset  = 0
   cursorCol  = 1
   cursorRow  = 0
-  slider  = HH /(#couplets *2)
+  slider  = HH /( #duo *2 )
 
   -- convert to binary
-  for i = 1,  #couplets do  -- "FF"
-    if i >= header then
-                        -- split nibbles
-      for s = 1,  2 do   -- 'FF'  to  'F' and 'F'
-        local this  = string .sub(couplets[i],  s,  s)
+  for i = 1,  #duo do  -- "FF"                skip header,  if necessary,
+    if i >= header then                       -- if used,  would need to be written back,  while saving
+
+      for s = 1,  2 do   --- split nibbles  'FF'  to  'F' and 'F'
+        local this  = string .sub( duo[i],  s,  s )
 
         if BPP  == 2 then -- reverse twopence,  little endian
 
           local hex  = hex2bin[ this ]      -- 'C'  to  '1100'
 
           local high  = string .sub( hex,  1,  2 )   -- '11'
-          local low  = string .sub( hex,  3,  4 )    -- '00'
+          local low  = string .sub( hex,  3,  4 )    --   '00'
 
-          bits[#bits +1]  = low ..high               -- '0011'
+          bits[ #bits +1 ]  = low ..high             -- '0011'
 
         else -- BPP == 4
-          bits[#bits +1]  = hex2bin[ this ]
+          bits[ #bits +1 ]  = hex2bin[ this ] -- 'F'  to  '1111'
         end -- if BPP
 
       end --  for s  = 1,  2
     end -- if i >= begin
-  end -- for i = 1,  #couplets
-end
+  end -- for i = 1,  #duo
+end -- readData()
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function writeData()
+  print('Writing to newfont.dat')
   local out  = io .open('newfont.dat', 'wb')
   local str  = ''
 
   if BPP == 2 then
-    for i = 1,  #bits /2,  2 do -- join two reversed twopence  '0011 1100'
+    for i = 1,  #bits,  2 do -- join two reversed twopence  '0011 1100'
 
       local high  = string .sub( bits[i],  1,  2 )          -- '00'
       local low  = string .sub( bits[i],  3,  4 )           --   '11'
@@ -195,7 +198,7 @@ function writeData()
     end -- for i = 1,  #bits
 
   else -- BPP == 4
-    for i = 1,  #bits /2,  2 do -- reverse nibbles
+    for i = 1,  #bits,  2 do -- reverse nibbles  1111 0000
 
       local high  = bin2hex[ bits[i] ]       -- '1111'  to  'F'
       local low  = bin2hex[ bits[i +1] ]     -- '0000'  to  '0'
@@ -209,6 +212,7 @@ function writeData()
 
   out :write( str )
   out :close()
+  print('Written')
 end
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -283,6 +287,7 @@ function mouseStuff()
 
     elseif cursorY > HH -100 then
       gra .setBackgroundColor( 0,  50,  100 )
+      bgCount  = 30  -- dim screen for a moment
       writeData()
     end -- if cursorY
 
@@ -379,12 +384,26 @@ function LO .update(dt)
     end -- if cursorCol and
 
   end -- if mou .isDown(2)
+
+  if bgCount > 0 then
+    bgCount  = bgCount -1
+
+    if bgCount == 0 then
+      gra .setBackgroundColor( 20,  80,  120 )
+    end -- if bgCount == 0
+  end -- if bgCount > 0
+
 end -- LO .update(dt)
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .draw()
   -- draw BPP label
+  if mou .getX() > WW -70 and mou .getX() < WW -30 and mou .getY() < 40 then
+    gra .setColor( 220,  50,  50,  250 )
+  else
+    gra .setColor( 220,  220,  220,  250 )
+  end
   gra .print( 'BPP: ' ..BPP,  WW -70,  15 )
 
   -- draw pixel-grid
@@ -486,8 +505,12 @@ function LO .draw()
 
   -- print save & offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )
-  gra .print( 'Save',  WW -60,  HH -50 )
   gra .print( offset,  WW -100,  HH -30 )
+
+  if mou .getX() > WW -70 and mou .getX() < WW -30 and mou .getY() > HH -100 then
+    gra .setColor( 220,  50,  50,  250 )
+  end
+  gra .print( 'Save',  WW -60,  HH -50 )
 end -- LO .draw()
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
