@@ -1,5 +1,5 @@
 # theSegSat
-Love2D Sega Saturn font viewer  
+Love2D Sega Saturn font viewer / painter  
 Install Love2D  https://love2d.org
 
 Screensize is set in the conf.lua file:  
