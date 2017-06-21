@@ -6,12 +6,16 @@ Screensize is set in the conf.lua file:
 
 >It's 1200x800 'cuz it shows up OK on my 1280x1024 monitor.  
 
-Copy **font.dat** and **font8.dat** into **theSegSat** dir.  
-*I could do that here, but I don't think you can include the font in a GPL license...*  
+Copy **font.dat** , **font8.dat** , and **SYSTEM.DAT** into **theSegSat** dir.  
+*I could do that here, but I don't think you can include 'em in a GPL license...*  
   
+    Love2D defaults to sandboxing the app within it's dir.
+    
     There's a trick to open files outside of that dir,  
-    but it involves installing luafilesystem...  meh.  
-    This is easier.  
+    but it involves installing luafilesystem
+    
+    I could use a protected call to check if the user has LFS installed
+    that allows reading outside the dir,  but that'll take time.
 
 Open in Love2D:  
 
