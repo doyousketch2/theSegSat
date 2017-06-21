@@ -27,9 +27,10 @@ win  = LO .window       --  enabled
 HH  = gra .getHeight()
 WW  = gra .getWidth()
 
--- copy font.dat and font8.dat into theSegSat dir
+-- copy font.dat  font8.dat  SYSTEM.DAT  into theSegSat dir
 
---     there's a trick to open files outside of that dir,
+--     Love2D defaults to sandboxing apps for security.
+--     There's a trick to open files outside of that dir,
 --     but it involves installing luafilesystem
 
 -- The fonts default to read-only, because they came from a CD-ROM
@@ -38,7 +39,7 @@ WW  = gra .getWidth()
 
 --     sudo chmod +w fon*.dat
 
-local filename  = 'font8.dat'
+local filename  = 'SYSTEM.DAT'
 local BPP  = 2          -- font  = 4,  font8  = 2,  press BPP display to toggle,
                         -- will lose changes you've painted to file tho,  'cuz it reloads data.
 
@@ -474,7 +475,7 @@ function LO .draw()
     local xx  = i *tileWidth *gap +21
     local yy  = rows *tileHeight *gap +11
     gra .line( xx,  11,  xx,  yy )
-  end -- for rows
+  end -- for cols
 
   for i = 1,  rows -1 do
     local xx  = cols *tileWidth *gap +21
@@ -501,7 +502,7 @@ function LO .draw()
       local yy  = cursorRow *gap
       gra .rectangle( 'line',  xx,  yy,  gap *2,  gap *2 )
     end -- if size
-  end -- if cursorCol > 0
+  end -- if cursor > 0
 
   -- print save & offset in bottom-right corner
   gra .setColor( 220,  220,  220,  250 )
