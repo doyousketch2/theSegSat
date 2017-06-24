@@ -34,7 +34,7 @@ Right-click to paint 4 pixels at a time.  Good for erasing.
 Click the BPP display to toggle between 2bit and 4 bit.  
 Reloads data, so any changes you have painted will revert.  
 
-Shift-scroll to scroll through faster  
-Ctrl-scroll for fine scrolling  
+**Shift**-scroll to scroll through faster  
+**Ctrl**-scroll for fine scrolling  
 
-Ctrl-click to insert a padded pixel.  
+**Ctrl**-click to insert a padded pixel.  
