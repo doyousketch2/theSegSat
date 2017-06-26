@@ -38,3 +38,4 @@ Reloads data, so any changes you have painted will revert.
 **Ctrl**-scroll for fine scrolling  
 
 **Ctrl**-click to insert a padded pixel.  
+**Backspace** or **Delete** to delete a padded pixel  
