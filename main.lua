@@ -1,5 +1,33 @@
---~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---  Löve theSegSat
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--  Löve theSegSat                               6 Jun 2017
+
+--  Eli Innis   @Doyousketch2                    GNU GPL v3
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-- copy font.dat  font8.dat  SYSTEM.DAT  into theSegSat dir
+
+--     Love2D defaults to sandboxing apps for security.
+--     There's a trick to open files outside of that dir,
+--     but it involves installing luafilesystem
+
+local filename  = 'SYSTEM.DAT'
+
+local header  = 88420    -- skip data before 88420,  if needed...
+
+local pixelSize  = 11
+local gap  = pixelSize +1
+
+local tileWidth  = 8     -- pixels per tile
+local tileHeight  = 16
+
+local cols  = 8          -- how many tiles are onscreen at once
+local rows  = 4
+
+local fontsize  = 18
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- no need to change variables below here
+
 
 LO   = love
 -- 3 letter abbrev's
@@ -27,37 +55,9 @@ win  = LO .window       --  enabled
 HH  = gra .getHeight()
 WW  = gra .getWidth()
 
--- copy font.dat  font8.dat  SYSTEM.DAT  into theSegSat dir
-
---     Love2D defaults to sandboxing apps for security.
---     There's a trick to open files outside of that dir,
---     but it involves installing luafilesystem
-
--- The fonts default to read-only, because they came from a CD-ROM
--- which is fine for now, 'cuz this app is just a viewer so far,
--- but eventually,  you'll want to set 'em so you can write changes
-
---     sudo chmod +w fon*.dat
-
-local filename  = 'SYSTEM.DAT'
-local BPP  = 4          -- font  = 4,  font8  = 2,  press BPP display to toggle,
-                        -- will lose changes you've painted to file tho,  'cuz it reloads data.
-
 local nib  = {}           -- 4 bits in each index location
 local bytes  = {}         -- pairs of nibbles
 local pixel  = {}         -- RGBA values for each pixel
-
-local pixelSize  = 11
-local gap  = pixelSize +1
-
-local tileWidth  = 8    -- "pixels" per tile
-local tileHeight  = 16
-
-local cols  = 11        -- how many tiles are onscreen at once
-local rows  = 4
-
-local fontsize  = 18
-local font  = gra .newFont( fontsize )
 
 local cursorX  = 0      -- actual screen location of mouse
 local cursorY  = 0
@@ -65,12 +65,11 @@ local cursorY  = 0
 local cursorCol  = 1    -- position within the grid-of-pixels that's been clicked on
 local cursorRow  = 0
 
-local paint  = 4        -- current color selected to paint with
-local header  = 0       -- skip data before 88000,  if needed...
-local head  = {}        -- storage for that junk 'till it's flushed out later
+local colors  = 16
+local paint  = 1        -- current color selected to paint with
 
-local till  = 4         -- iterate 'till this many colors.   calculated during LO .load()
-local slider  = 0       -- distance slider travels while scrolling.   ^ ditto
+local head  = {}        -- cache for header 'till it's flushed out later
+local slider  = 0       -- distance slider travels while scrolling.  calculated during readData()
 
 local click  = 0        -- disables click repeat,  when you toggle BPP
 local cursor  = 1       -- display cursor position?
@@ -83,63 +82,49 @@ local bgCount  = 0      -- background counter,  to flash color after written
 local maxW  = cols *tileWidth *gap +21   -- boundaries of clickable grid area
 local maxH  = rows *tileHeight *gap +11
 
+local font  = gra .newFont( fontsize )
+
 -- hexadecimal to binary-equivalent chart.
 local hex2bin  = {  ['0'] = '0000',  ['1'] = '0001',  ['2'] = '0010',  ['3'] = '0011',
                     ['4'] = '0100',  ['5'] = '0101',  ['6'] = '0110',  ['7'] = '0111',
                     ['8'] = '1000',  ['9'] = '1001',  ['A'] = '1010',  ['B'] = '1011',
                     ['C'] = '1100',  ['D'] = '1101',  ['E'] = '1110',  ['F'] = '1111'  }
 
-
 local bin2hex  = {  ['0000'] = '0',  ['0001'] = '1',  ['0010'] = '2',  ['0011'] = '3',
                     ['0100'] = '4',  ['0101'] = '5',  ['0110'] = '6',  ['0111'] = '7',
                     ['1000'] = '8',  ['1001'] = '9',  ['1010'] = 'A',  ['1011'] = 'B',
                     ['1100'] = 'C',  ['1101'] = 'D',  ['1110'] = 'E',  ['1111'] = 'F'  }
 
--- colorTable for RGBA values.  includes 2bit,  3bit,  4bit  and 5bit values.
-local coTabl  = {  ['00']  = 0,  ['01']  = 50,  ['10']  = 150,  ['11']  = 255,
+-- 4bit hybrid colorTable for viewing,  2bit values will become tinted
+local coTabl  = {  ['0000']  = 0,    ['0001']  = 240,  ['0010']  = 140,  ['0011']  = 40,
 
-                   ['000']  = 0,    ['001']  = 30,   ['010']  = 60,   ['011']  = 90,
-                   ['100']  = 120,  ['101']  = 150,  ['110']  = 180,  ['111']  = 255,
-
-                   ['0000']  = 0,    ['0001']  = 15,   ['0010']  = 30,   ['0011']  = 45,
                    ['0100']  = 60,   ['0101']  = 75,   ['0110']  = 90,   ['0111']  = 105,
                    ['1000']  = 120,  ['1001']  = 135,  ['1010']  = 150,  ['1011']  = 165,
-                   ['1100']  = 180,  ['1101']  = 195,  ['1110']  = 210,  ['1111']  = 255,
+                   ['1100']  = 180,  ['1101']  = 195,  ['1110']  = 210,  ['1111']  = 255  }
 
-                   ['00000']  = 0,    ['00001']  = 8,    ['00010']  = 24,   ['00011']  = 32,
-                   ['00100']  = 40,   ['00101']  = 48,   ['00110']  = 56,   ['00111']  = 64,
-                   ['01000']  = 72,   ['01001']  = 80,   ['01010']  = 88,   ['01011']  = 96,
-                   ['01100']  = 104,  ['01101']  = 112,  ['01110']  = 120,  ['01111']  = 128,
-                   ['10000']  = 135,  ['10001']  = 143,  ['10010']  = 151,  ['10011']  = 160,
-                   ['10100']  = 167,  ['10101']  = 175,  ['10110']  = 183,  ['10111']  = 191,
-                   ['11000']  = 200,  ['11001']  = 207,  ['11010']  = 215,  ['11011']  = 223,
-                   ['11100']  = 231,  ['11101']  = 240,  ['11110']  = 247,  ['11111']  = 255  }
+-- "index to key" lookups, 'cuz key-value pairs are unordered in Lua
+local ki  = 0
 
- -- "index to key" lookups, 'cuz key-value pairs are unordered in Lua
-local ki  = 0    -- reverse entries?
+local four   = {  '0000', '0001', '0010', '0011', '0100', '0101', '0110', '0111',
+                  '1000', '1001', '1010', '1011', '1100', '1101', '1110', '1111'  }
 
-local two    = { '11',  '10',  '01',  '00' }
-
-local three  = { '111',  '110',  '101',  '100',  '011',  '010',  '001',  '000'   }
-
-local four   = { '1111', '1110', '1101', '1100', '1011', '1010', '1001', '1000',
-                 '0111', '0110', '0101', '0100', '0011', '0010', '0001', '0000'  }
-
-local bitTabl2  = {  [0]  = '00',  [50]  = '01',  [150]  = '10',  [255]  = '11'  }
-
-local bitTabl4  = {    [0]  = '0',   [15]  = '1',   [30]  = '2',   [45]  = '3',
+local bitTabl4  = {    [0]  = '0',  [240]  = '1',  [140]  = '2',   [40]  = '3',
                       [60]  = '4',   [75]  = '5',   [90]  = '6',  [105]  = '7',
                      [120]  = '8',  [135]  = '9',  [150]  = 'A',  [165]  = 'B',
                      [180]  = 'C',  [195]  = 'D',  [210]  = 'E',  [255]  = 'F'  }
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-function alpha( r, g, b ) -- if {0,0,0} then alpha is also 0
-  a  = { r, g, b }
+function alpha( this )
 
-  if r == 0 and g == 0 and b == 0 then
-    a  = { 255, 255, 255,  0 }
-  end -- if r...
+  if this == 0 then -- if {0,0,0} then alpha is also 0  (transparent background)
+    a  = { 0, 0, 0,  0 }
+
+  elseif this == 240 or this == 140 or this == 40 then -- 0001  0010  0011
+    a  = { this, this, this,  140 } -- if only using two bits, then tint
+  else
+    a  = { this, this, this,  255 } -- standard color,  solid alpha value 255
+  end -- if this ==
 
     return a
 end -- function alpha()
@@ -148,23 +133,15 @@ end -- function alpha()
 
 function readData()
   if #nib > 0 then -- clear tables
-    local count  = #bits
-    for i = 1,  count do  bits[i]  = nil end
+    local count  = #nib
+    for i = 1,  count do  nib[i]  = nil end
 
     count  = #bytes
     for i = 1,  count do  bytes[i]  = nil end
 
     count  = #pixel
     for i = 1,  count do  pixel[i]  = nil end
-  end -- if #bits
-
-  if BPP == 2 then
-    till  = 4   -- amount of colors available
-    paint  = 4   -- select last color
-  else
-    till  = 16
-    paint  = 16
-  end -- if BPP
+  end -- if #nib
 
   -- loop through raw data and put bytes into pairs
   local data  = assert( io .open( filename, 'rb' ))
@@ -181,34 +158,22 @@ function readData()
   slider  = HH /( #bytes *2 )
 
   -- convert to binary
-  for i = 1,  #bytes do  -- "FF"                skip header,  if necessary,
+  for i = 1,  #bytes do  -- "FF"
 
-    if i < header then
+    if i < header then   -- skip header,  if necessary,
       head[ #head +1 ]  = bytes[i]
     else
       for s = 1,  2 do   --- split nibbles  'FF'  to  'F' and 'F'
+
         local this  = string .sub( bytes[i],  s,  s )
+        nib[ #nib +1 ]  = hex2bin[ this ] -- 'F'  to  '1111'
 
-        if BPP  == 2 then -- reverse twopence,  little endian
-
-          local hex  = hex2bin[ this ]      -- 'C'  to  '1100'
-
-          local high  = string .sub( hex,  1,  2 )   -- '11'
-          local low  = string .sub( hex,  3,  4 )    --   '00'
-
-          nib[ #nib +1 ]  = low ..high               -- '0011'
-
-        else -- BPP == 4
-
-          nib[ #nib +1 ]  = hex2bin[ this ] -- 'F'  to  '1111'
-
-        end -- if BPP
       end --  for s  = 1,  2
     end -- if i < header
   end -- for i = 1,  #bytes
 
-  for i = 1,  #nib do
-    pixel[#pixel +1]  = alpha(  coTabl[ nib[i] ],  coTabl[ nib[i] ],  coTabl[ nib[i] ]  )
+  for i = 1,  #nib do -- determine alpha value for pixel
+    pixel[#pixel +1]  = alpha(  coTabl[ nib[i] ]  )
   end -- for i = 1,  #nib
 end -- readData()
 
@@ -226,46 +191,23 @@ function writeData()
     bytes[#bytes +1]  = head[i]
   end -- for i = 1,  #head
 
-  for i = 1,  #pixel,  2 do -- generate export list
-    if pixel[i][1] == pixel[i][2] then -- it's not a grey pixel,  so skip padding
+  local export  = {} -- generate export list
+  for i = 1,  #pixel do
+    if pixel[i][1] == pixel[i][2] then -- strip padding
 
-      if BPP == 2 then -- use bit table 2
-        bytes[#bytes +1]  = bitTabl2[ pixel[i][1] ] ..bitTabl2[ pixel[i +1][1] ]
-      else          -- use bit table 4
-        bytes[#bytes +1]  = bitTabl4[ pixel[i][1] ] ..bitTabl4[ pixel[i +1][1] ]
-      end
-
-    end -- if pixel[i]
+      export[#export +1]  = bitTabl4[ pixel[i][1] ]
+    end -- if pixel[i] == pixel[i][2]
   end -- for i = 1,  #pixel
 
-  if BPP == 2 then
-    for i = 1,  #bytes,  2 do -- join two reversed twopence  '0011  1100'
+  for i = 1,  #export -1,  2 do -- join pixels (nibbles) to create bytes
+      bytes[#bytes +1]  = export[i] ..export[i +1]
+  end -- for
 
-      local high  = string .sub( bytes[i],  1,  2 )       -- '00'
-      local low  = string .sub( bytes[i],  3,  4 )        --   '11'
+  for i = 1,  #bytes do
+    local num  = tonumber( bytes[i],  16 )  -- 'F0'  to  240
+    out :write(  string .char( num )  )     -- ASCII  U+0240
+  end -- for i = 1,  #bytes
 
-      local bin  = low ..high                             -- '1100'
-      local nibble1  = bin2hex[ bin ]                     -- 'C'
-
-      local high  = string .sub( bytes[i +1],  1,  2 )          -- '11'
-      local low  = string .sub( bytes[i +1],  3,  4 )           --   '00'
-
-      local bin  = low ..high                                   -- '0011'
-      local nibble2  = bin2hex[ bin ]                           -- '3'
-
-      local byte  = nibble1 ..nibble2           -- 'C3'
-      local num  = tonumber( byte,  16 )       -- 195
-      str  = str ..string .char( num )        -- ASCII  U+0195
-    end -- for i = 1,  #bytes
-
-  else -- BPP == 4
-    for i = 1,  #bytes do
-      local num  = tonumber( bytes[i],  16 )  -- 'F0'  to  240
-      str  = str ..string .char( num )       -- ASCII  U+0240
-    end -- for i = 1,  #bytes
-  end
-
-  out :write( str )
   out :close()
   print('Written')
 end
@@ -327,21 +269,12 @@ function mouseStuff()
   if cursorX > WW -70 and cursorX < WW -30 then  -- clicked on right-side of screen
     cursor  = 0
 
-    if cursorY < 40 then -- toggle BPP's
-      if click == 0 then -- only do this once,  no repeat
-        if BPP == 2 then  BPP  = 4
-        else  BPP  = 2
-        end -- BPP
-        readData() -- refresh with new BPP value
-        click  = 1
-      end -- if click
-
-    elseif cursorY < 450 then -- clicked within palette
+    if cursorY < 450 then -- clicked within palette
       paint  = math .floor((cursorY -38) /24)    -- determine paint color
       if paint < 1 then                          -- min value
         paint  = 1
-      elseif paint > till then                   -- max
-        paint  = till
+      elseif paint > colors then                   -- max
+        paint  = colors
       end -- if paint
 
     elseif cursorY > HH -100 then
@@ -394,28 +327,37 @@ function paintPixel()
 
     loc  = oneTile +xx +yy +offset               -- current pixel position within the data
 
-    local digits  = two[ paint ]                 -- lookup binary equivalent
-    if BPP == 4 then
-      digits  = four[ paint ]
-    end -- if BPP
-
-    if key .isDown( 'delete' ) then -- delete
-      pixel[ loc ]  = nil
-      ki  = 0
-    elseif key .isDown( 'lctrl' ) or key .isDown( 'rctrl' ) then
-      table .insert(  pixel,  loc,  {235, 175, 135}  )
+    if key .isDown( 'lctrl' ) or key .isDown( 'rctrl' ) then
+      table .insert(  pixel,  loc,  {235, 175, 135}  ) -- insert padding
     else
-      pixel[ loc ]  = alpha(  coTabl[ digits ],  coTabl[ digits ],  coTabl[ digits ]  )
-    end -- if key .isDown( 'shift' )
+      if pixel[ loc ][1] == pixel[ loc ][2] then -- only paint in pixels that aren't padding
+
+        local digits  = four[ paint ] -- get binary digits for current color,  '1' to '0001'
+
+        local rgb  = coTabl[ digits ] -- get RGB value
+        local rgba = alpha( rgb ) -- determine alpha transparency
+
+        pixel[ loc ]  = rgba  -- paint with current color
+
+      end -- if pixel[ loc ][1] == pixel[ loc ][2]
+    end -- if key .isDown( 'lctrl' )
   end -- if cursor
 end -- paintPixel()
 
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .update(dt)
-  -- easy exit
-  if key .isDown( 'escape' ) then
+
+  if key .isDown( 'escape' ) then -- easy exit
     eve .push( 'quit' )
+
+  elseif key .isDown( 'delete' ) or key .isDown( 'backspace' ) then -- delete padding
+
+      if pixel[ loc ][1] ~= pixel[ loc ][2] then
+        table .remove( pixel, loc )
+        ki  = 0
+      end -- if pixel[ loc ][1] ~= pixel[ loc ][2]
+
   end -- key .isDown
 
 
@@ -464,68 +406,43 @@ end -- LO .update(dt)
 --~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 function LO .draw()
-  -- draw BPP label
-  if mou .getX() > WW -70 and mou .getX() < WW -30 and mou .getY() < 40 then
-    gra .setColor( 220,  50,  50,  250 )
-  else
-    gra .setColor( 220,  220,  220,  250 )
-  end
-  gra .print( 'BPP: ' ..BPP,  WW -70,  15 )
 
   -- draw pixel-grid
   gra .setPointSize( 5 )
 
-  if #nib > 0 then -- don't draw during data swaps
-    i  = 1
-    for r  = 0,  rows -1  do
-      for c  = 0,  cols -1  do
-        for y  = 1,  tileHeight  do
-          for x  = 1,  tileWidth  do
-            ki  = i +offset
-            gra .setColor( pixel[ ki ] )
+  i  = 1
+  for r  = 0,  rows -1  do
+    for c  = 0,  cols -1  do
+      for y  = 1,  tileHeight  do
+        for x  = 1,  tileWidth  do
+          gra .setColor( pixel[ i +offset ] )
 
-            local xx  = c *gap *tileWidth
-            local yy  = r *gap *tileHeight
+          local xx  = c *gap *tileWidth
+          local yy  = r *gap *tileHeight
 
-            -- draw pixel    style,  x pos,           y pos,       width,      height
-            gra .rectangle( 'fill',  x *gap +xx +10,  y *gap +yy,  pixelSize,  pixelSize )
-            i  = i +1
+          -- draw pixel    style,  x pos,           y pos,       width,      height
+          gra .rectangle( 'fill',  x *gap +xx +10,  y *gap +yy,  pixelSize,  pixelSize )
+          i  = i +1
+        end -- tileWidth
+      end -- tileHeight
+    end -- cols
+  end -- rows
 
-          end -- tileWidth
-        end -- tileHeight
-      end -- cols
-    end -- rows
+  -- outline palette area
+  gra .setColor( 220,  220,  220,  50 )
+  gra .rectangle( 'line',  WW -70,  50,  40,  410 )
 
-    -- outline palette area
-    gra .setColor( 220,  220,  220,  50 )
-    if BPP == 2 then
-      gra .rectangle( 'line',  WW -70,  50,  40,  120 )
-    else
-      gra .rectangle( 'line',  WW -70,  50,  40,  410 )
-    end
+  -- draw in color swatches
+  gra .setPointSize( 20 )
 
-    -- draw in color swatches
-    gra .setPointSize( 20 )
+  for i = 1,  colors  do
 
-    for i = 1,  till  do
+    ki  = four[i] -- look up color key
+    local rgba  = alpha(  coTabl[ ki ]  )
+    gra .setColor( rgba )
 
-      if BPP == 2 then -- convert index to key
-        ki  = two[i]
-      else
-        ki  = four[i]
-      end
-
-      local R  = coTabl[ ki ]
-      local G  = coTabl[ ki ]
-      local B  = coTabl[ ki ]
-      local rgba  = alpha( R,  G,  B )
-
-      gra .setColor( rgba )
-
-      gra .points( WW -50,  i *24 +50 )
-    end -- for i
-
-  end -- if #nib  a.k.a.  don't draw during data swaps
+    gra .points( WW -50,  i *24 +50 )
+  end -- for i
 
   -- grid divisions
   gra .setColor( 220,  220,  220,  50 )
