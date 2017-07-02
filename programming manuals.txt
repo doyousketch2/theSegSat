@@ -1,0 +1,77 @@
+
+  SuperH RISC Engine   SH-1/SH-2   Programming Manual   293 pages
+  http://antime.kapsi.fi/sega/files/h12p0.pdf
+
+  Hitachi SuperH™ RISC Engine   SH-1/SH-2/SH-DSP   Programming Manual   491 pages
+  http://rockbox.sourceforge.net/rockbox/docs/sh1_2p.pdf
+
+  Renesas SH Instruction Set Summary
+  http://www.shared-ptr.com/sh_insns.html
+
+  https://www.romhacking.net/documents/645
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  Collection of Sega 32X Manuals  ( uses SH-2's )
+  http://www.romhacking.net/documents/279
+
+  Dr. DevSter's Guide to The Sega 32x
+  http://devster.monkeeh.com/sega/32xguide1.txt
+
+  SH7604   Hardware Manual  634 pages - includes instruction set
+  http://pdf.datasheetcatalog.com/datasheet/HitachiSemiconductor/mXwuttu.pdf
+
+  Hitachi Single-Chip RISC Micro SH7000 and SH7600 Series Programming Manual   300 pages
+  https://ia600400.us.archive.org/17/items/bitsavers_hitachisupSuperHRISCEngineProgrammingManual1994_7521594/SH7000_7600_Series_Super_H_RISC_Engine_Programming_Manual_1994.pdf
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  You might find decent ASM info by looking at previous processors
+  68000,  65xx,  z80,  pdp-11,
+  maybe some generic intel conventions,
+  but they have a few specifics that won't apply.
+
+  https://emu-docs.org/CPU%2068k
+
+  http://68k.hax.com
+
+  http://info.sonicretro.org/SCHG:68000_Instruction_Set
+
+  https://en.wikibooks.org/wiki/68000_Assembly
+
+  http://hackaday.com/2016/12/23/disassembly-required
+
+  http://www.romhacking.net/documents/318
+
+  https://skilldrick.github.io/easy6502
+
+  https://en.wikibooks.org/wiki/6502_Assembly
+
+  http://proemulator.sourceforge.net
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  YouTube vids that might shed some light on what's going on
+
+  Game Physics (in Assembler) - Computerphile
+  https://www.youtube.com/watch?v=Kalmryn9_sE
+
+  8-bit CPU control logic: Part 1
+  https://www.youtube.com/watch?v=dXdoim96v5A
+
+  Programming my 8-bit breadboard computer
+  https://www.youtube.com/watch?v=9PPrrSyubG0
+
+--~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  There's a J2-core CPU that's a modern open-source clone of the SH-2
+  Hard to say if it'll offer any real help.  Better info found above.
+
+  vid on development
+  https://www.youtube.com/watch?v=lZGHbMS882w
+
+  J2 Initial RTL Release: Contains {cpu, ddrc, uart}.
+  http://0pf.org/community.html
+
+  unzip           SH-2 Instruction Set.ods
+  from this dir   soc_top/components/cpu/decode/gen
+
