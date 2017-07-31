@@ -39,3 +39,5 @@ Reloads data, so any changes you have painted will revert.
 
 **Ctrl**-click to insert a padded pixel.  
 **Backspace** or **Delete** to delete a padded pixel  
+
+![pic](https://pbs.twimg.com/media/DDOfMd5XsAAGm7Y?format=png)
